@@ -50,7 +50,7 @@ def setup_matrix(rows, cols, chain_length, parallel,
 
 
 @click.command()
-@click.option('--watch-folder', '-w', default='/home/pi/watch_folder',
+@click.option('--watch-folder', '-w', default='./samples',
               help='監視するフォルダのパス')
 @click.option('--rows', default=64, help='パネル1枚あたりの行数')
 @click.option('--cols', default=64, help='パネル1枚あたりの列数')

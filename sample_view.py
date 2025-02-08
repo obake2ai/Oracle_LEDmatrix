@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import time
 import glob
@@ -50,7 +49,6 @@ def setup_matrix(rows, cols, chain_length, parallel,
 
     # --no-hardware-pulse ならハードウェアパルス生成を無効化
     if no_hardware_pulse:
-        # rpi-rgb-led-matrix の Python ラッパーでは disable_hardware_pulsing に True を設定
         options.disable_hardware_pulsing = True
 
     return RGBMatrix(options=options)
@@ -73,39 +71,53 @@ def main(watch_folder, rows, cols, chain_length, parallel,
          hardware_mapping, gpio_slowdown, no_hardware_pulse):
     """
     指定されたオプションを使って LED パネルをセットアップし、
-    監視フォルダにある最も新しい画像ファイルを 3x3(合計9枚)のパネルに表示。
-    新たな画像が入るまで表示を保持する。
-    """
-    # LED マトリックスのセットアップ
-    matrix = setup_matrix(rows, cols, chain_length, parallel,
-                          hardware_mapping, gpio_slowdown,
-                          no_hardware_pulse)
+    監視フォルダにある最も新しい画像ファイルを直列に接続されたパネルに表示します。
+    新たな画像が入るまで表示を保持します。
 
-    # パネル全体の解像度 (3x3, 64x64 の場合は 192x192)
+    改善点:
+    - ダブルバッファリング (matrix.CreateFrameCanvas() と SwapOnVSync) により更新時のちらつきを低減
+    - GPIOスローダウンやハードウェアパルス無効化のオプションも引き続き利用可能
+    """
+    # LEDマトリックスのセットアップ
+    matrix = setup_matrix(rows, cols, chain_length, parallel,
+                          hardware_mapping, gpio_slowdown, no_hardware_pulse)
+
+    # パネル全体の解像度 (例: 3x3パネル、各64x64 → 192x192)
     total_width = cols * chain_length
     total_height = rows * parallel
 
-    # 現在表示中のファイルパスを記録しておくための変数
+    # ダブルバッファリング用キャンバスの作成
+    canvas = matrix.CreateFrameCanvas()
+
+    # 現在表示中の画像パスを記録
     current_displayed_path = None
 
-    while True:
-        latest_image_path = get_latest_image_path(watch_folder)
+    try:
+        while True:
+            latest_image_path = get_latest_image_path(watch_folder)
 
-        # 新しい画像ファイルが見つかった場合のみ再表示
-        if latest_image_path and latest_image_path != current_displayed_path:
-            try:
-                image = Image.open(latest_image_path).convert("RGB")
-                # 合計解像度にリサイズ
-                image = image.resize((total_width, total_height), Image.Resampling.LANCZOS)
+            # 新しい画像ファイルが見つかった場合のみ再表示
+            if latest_image_path and latest_image_path != current_displayed_path:
+                try:
+                    image = Image.open(latest_image_path).convert("RGB")
+                    # 合計解像度にリサイズ（高品質な Lanczos フィルタを使用）
+                    image = image.resize((total_width, total_height), Image.Resampling.LANCZOS)
 
-                matrix.SetImage(image, 0, 0)
-                current_displayed_path = latest_image_path
-                print(f"[INFO] Displayed new image: {latest_image_path}")
-            except Exception as e:
-                print(f"[ERROR] Failed to display {latest_image_path}: {e}")
+                    # キャンバスをクリアして新しい画像をセット
+                    canvas.Clear()
+                    canvas.SetImage(image, 0, 0)
+                    # ダブルバッファリングにより、SwapOnVSync() でスムーズに更新
+                    canvas = matrix.SwapOnVSync(canvas)
 
-        # 1秒ごとに監視フォルダを再確認
-        time.sleep(1)
+                    current_displayed_path = latest_image_path
+                    print(f"[INFO] Displayed new image: {latest_image_path}")
+                except Exception as e:
+                    print(f"[ERROR] Failed to display {latest_image_path}: {e}")
+
+            # 1秒ごとに監視フォルダを再確認
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting gracefully.")
 
 
 if __name__ == '__main__':

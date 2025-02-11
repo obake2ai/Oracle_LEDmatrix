@@ -37,7 +37,8 @@ def setup_matrix(rows, cols, chain_length, parallel,
     options.rows = rows
     options.cols = cols
     options.chain_length = chain_length
-    options.parallel = parallel  # ここでは物理的には 1 を指定します
+    # 物理的なパネルは1段分なので、ここでは parallel=1 としておく
+    options.parallel = 1
     options.hardware_mapping = hardware_mapping
 
     if gpio_slowdown is not None:
@@ -54,6 +55,8 @@ def setup_matrix(rows, cols, chain_length, parallel,
 @click.command()
 @click.option('--watch-folder', '-w', default='./samples',
               help='監視するフォルダのパス')
+@click.option('--image', default=None, type=str,
+              help='表示する画像ファイルのパス。指定された場合、監視フォルダではなくこの画像を表示します。')
 @click.option('--rows', default=64, type=int,
               help='パネル1枚あたりの行数')
 @click.option('--cols', default=64, type=int,
@@ -74,13 +77,20 @@ def setup_matrix(rows, cols, chain_length, parallel,
               help='PWM LSB nanoseconds。低い値ほど高フレッシュレートになる')
 @click.option('--idx', default=1, type=int,
               help='全体画像の中で表示する段の番号 (上から1～parallel)。例えば --parallel=3 の場合、--idx 1,2,3 でそれぞれ上、中、下の部分を表示')
-def main(watch_folder, rows, cols, chain_length, parallel,
+def main(watch_folder, image, rows, cols, chain_length, parallel,
          hardware_mapping, gpio_slowdown, no_hardware_pulse,
          pwm_bits, pwm_lsb_nanoseconds, idx):
     """
-    LED パネルをセットアップし、監視フォルダ内の最新画像から
-    全体画像（全体解像度: 横 = chain-length×cols, 縦 = parallel×rows）を作成し、
-    指定された idx 番目の段（縦方向の1/parallel）をクロップして表示します。
+    LED パネルをセットアップし、以下のいずれかの画像を表示します。
+
+    - --image が指定された場合は、その画像ファイルを表示。
+    - 指定がない場合は、監視フォルダ内の最新画像を表示。
+
+    全体画像は、
+      横: chain-length * cols
+      縦: parallel * rows
+    の解像度で構成され、上から idx 番目の段 (高さ rows) をクロップして
+    物理的な LED パネル（1段分）に表示します。
 
     各ハードウェアは物理的に1段分の表示（解像度: 横 = chain-length×cols, 縦 = rows）を行います。
     複数台のハードウェアで全体画像の各段を表示する場合、
@@ -93,7 +103,7 @@ def main(watch_folder, rows, cols, chain_length, parallel,
     physical_width = overall_width
     physical_height = rows
 
-    # ※ 物理ハードウェアは1段なので、matrix の parallel には 1 を指定
+    # 物理ハードウェアは1段なので、matrix の parallel は常に 1
     matrix = setup_matrix(rows, cols, chain_length, parallel=1,
                           hardware_mapping=hardware_mapping,
                           gpio_slowdown=gpio_slowdown,
@@ -104,7 +114,7 @@ def main(watch_folder, rows, cols, chain_length, parallel,
     canvas = matrix.CreateFrameCanvas()
     current_displayed_path = None
 
-    # idx が 1 未満の場合は 1、parallel より大きい場合は parallel とする
+    # idx の値を 1 ～ parallel の範囲に補正
     if idx < 1:
         idx = 1
     if idx > parallel:
@@ -112,32 +122,37 @@ def main(watch_folder, rows, cols, chain_length, parallel,
 
     try:
         while True:
-            latest_image_path = get_latest_image_path(watch_folder)
-            if latest_image_path and latest_image_path != current_displayed_path:
+            # --image が指定されている場合はそちらを利用、それ以外は監視フォルダ内の最新画像を取得
+            if image is not None:
+                new_path = image
+            else:
+                new_path = get_latest_image_path(watch_folder)
+
+            if new_path and new_path != current_displayed_path:
                 try:
-                    image = Image.open(latest_image_path).convert("RGB")
+                    img = Image.open(new_path).convert("RGB")
                     if parallel > 1:
                         # まず、元画像を全体画像の解像度にリサイズ
-                        image = image.resize((overall_width, overall_height), Image.Resampling.LANCZOS)
+                        img = img.resize((overall_width, overall_height), Image.Resampling.LANCZOS)
                         # 上から idx 番目の段をクロップする
                         crop_top = (idx - 1) * rows
                         crop_bottom = idx * rows
-                        image = image.crop((0, crop_top, overall_width, crop_bottom))
+                        img = img.crop((0, crop_top, overall_width, crop_bottom))
                         # クロップ後の画像は (overall_width, rows) となるので、物理パネルに合わせて表示
                         canvas.Clear()
-                        canvas.SetImage(image, 0, 0)
-                        print(f"[INFO] Displayed cropped image (idx={idx}) from {latest_image_path}")
+                        canvas.SetImage(img, 0, 0)
+                        print(f"[INFO] Displayed cropped image (idx={idx}) from {new_path}")
                     else:
                         # parallel==1 の場合は、全体画像を物理解像度にリサイズして表示
-                        image = image.resize((physical_width, physical_height), Image.Resampling.LANCZOS)
+                        img = img.resize((physical_width, physical_height), Image.Resampling.LANCZOS)
                         canvas.Clear()
-                        canvas.SetImage(image, 0, 0)
-                        print(f"[INFO] Displayed full image (parallel=1) from {latest_image_path}")
+                        canvas.SetImage(img, 0, 0)
+                        print(f"[INFO] Displayed full image (parallel=1) from {new_path}")
 
                     canvas = matrix.SwapOnVSync(canvas)
-                    current_displayed_path = latest_image_path
+                    current_displayed_path = new_path
                 except Exception as e:
-                    print(f"[ERROR] Failed to display {latest_image_path}: {e}")
+                    print(f"[ERROR] Failed to display {new_path}: {e}")
             time.sleep(1)
     except KeyboardInterrupt:
         print("Exiting gracefully.")

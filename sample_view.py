@@ -10,23 +10,19 @@ from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 def get_latest_image_path(folder):
     """
-    指定フォルダ内のファイルのうち、もっとも新しい画像ファイルのパスを返す。
+    指定フォルダ内のファイルのうち、最も新しい画像ファイルのパスを返す。
     画像ファイルが無い場合は None を返す。
     """
     valid_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp")
     files = glob.glob(os.path.join(folder, "*"))
-
     if not files:
         return None
 
     # 更新時刻が新しい順にソート
     files.sort(key=os.path.getmtime, reverse=True)
-
-    # 画像ファイルかどうかを確認し、一番最初に見つかった画像ファイルを返す
     for file_path in files:
         if file_path.lower().endswith(valid_extensions):
             return file_path
-
     return None
 
 
@@ -35,24 +31,20 @@ def setup_matrix(rows, cols, chain_length, parallel,
                  pwm_bits, pwm_lsb_nanoseconds):
     """
     rpi-rgb-led-matrix のオプションを設定し、RGBMatrix インスタンスを返す。
-    PWM 関連のパラメータを設定することでフレッシュレートの向上を試みる。
+    今回は物理ハードウェアは1段分なので、parallel は 1 を指定してセットアップします。
     """
     options = RGBMatrixOptions()
     options.rows = rows
     options.cols = cols
     options.chain_length = chain_length
-    options.parallel = parallel
+    options.parallel = parallel  # ここでは物理的には 1 を指定します
     options.hardware_mapping = hardware_mapping
 
-    # GPIO スローダウン設定
     if gpio_slowdown is not None:
         options.gpio_slowdown = gpio_slowdown
-
-    # ハードウェアパルス無効化の設定
     if no_hardware_pulse:
         options.disable_hardware_pulsing = True
 
-    # PWM 関連の設定
     options.pwm_bits = pwm_bits
     options.pwm_lsb_nanoseconds = pwm_lsb_nanoseconds
 
@@ -69,85 +61,83 @@ def setup_matrix(rows, cols, chain_length, parallel,
 @click.option('--chain-length', default=3, type=int,
               help='横方向に連結されたパネル数')
 @click.option('--parallel', default=3, type=int,
-              help='縦方向に連結されたパネル数')
+              help='全体画像を縦方向に分割する段数。各ハードウェアは1段分を表示します')
 @click.option('--hardware-mapping', default='regular',
               help='rpi-rgb-led-matrix での配線方法 (例: "regular", "adafruit-hat" 等)')
 @click.option('--gpio-slowdown', default=0, type=int,
-              help='GPIO のスローダウン設定。0 で最大フレッシュレート (ただしハードウェアの安定性に注意)')
+              help='GPIO のスローダウン設定。0で最大フレッシュレート（ただしハードウェアの安定性に注意）')
 @click.option('--no-hardware-pulse', is_flag=True,
-              help='--led-no-hardware-pulse 相当。root 権限不要で実行する場合に指定する。')
+              help='ハードウェアパルス無効化（root権限不要で実行する場合に指定）')
 @click.option('--pwm-bits', default=7, type=int,
               help='PWM ビット数。低い値ほど高フレッシュレートになるが色の階調が減少')
 @click.option('--pwm-lsb-nanoseconds', default=80, type=int,
               help='PWM LSB nanoseconds。低い値ほど高フレッシュレートになる')
-@click.option('--idx', default=0, type=int,
-              help='表示するパネルの行番号 (1～parallel)。0の場合は全体表示します')
+@click.option('--idx', default=1, type=int,
+              help='全体画像の中で表示する段の番号 (上から1～parallel)。例えば --parallel=3 の場合、--idx 1,2,3 でそれぞれ上、中、下の部分を表示')
 def main(watch_folder, rows, cols, chain_length, parallel,
          hardware_mapping, gpio_slowdown, no_hardware_pulse,
          pwm_bits, pwm_lsb_nanoseconds, idx):
     """
-    LED パネルをセットアップし、監視フォルダにある最新の画像を表示します。
+    LED パネルをセットアップし、監視フォルダ内の最新画像から
+    全体画像（全体解像度: 横 = chain-length×cols, 縦 = parallel×rows）を作成し、
+    指定された idx 番目の段（縦方向の1/parallel）をクロップして表示します。
 
-    改善点:
-    - ダブルバッファリング (CreateFrameCanvas と SwapOnVSync) により更新時のちらつきを低減
-    - PWM ビット数と PWM LSB nanoseconds の調整により、フレッシュレート向上を試みる
-    - 新たに --idx オプションを追加。これにより、画像を縦方向に分割し、
-      指定された行 (1-indexed) の部分のみをクロップして表示できます。
-      例: chain-length=3（解像度 192×192）で parallel=3 のとき、
-           --idx 1 なら元画像の上部 1/3 をクロップし 192×64 にリサイズ、上段に表示。
-           parallel=4, --idx 2 なら元画像の上から2番目の1/4の部分をクロップし表示。
+    各ハードウェアは物理的に1段分の表示（解像度: 横 = chain-length×cols, 縦 = rows）を行います。
+    複数台のハードウェアで全体画像の各段を表示する場合、
+    各ハードウェアには同じ画像を渡し、--parallel で全体の段数、--idx で表示する段番号 (上から) を指定してください。
     """
-    # LEDマトリックスのセットアップ
-    matrix = setup_matrix(rows, cols, chain_length, parallel,
-                          hardware_mapping, gpio_slowdown, no_hardware_pulse,
-                          pwm_bits, pwm_lsb_nanoseconds)
+    # 全体画像の想定解像度
+    overall_width = cols * chain_length
+    overall_height = rows * parallel
+    # 物理的な表示解像度（各ハードウェアは1段分）
+    physical_width = overall_width
+    physical_height = rows
 
-    # パネル全体の解像度 (例: 3x3パネル、各64x64 → 192x192)
-    total_width = cols * chain_length
-    total_height = rows * parallel
+    # ※ 物理ハードウェアは1段なので、matrix の parallel には 1 を指定
+    matrix = setup_matrix(rows, cols, chain_length, parallel=1,
+                          hardware_mapping=hardware_mapping,
+                          gpio_slowdown=gpio_slowdown,
+                          no_hardware_pulse=no_hardware_pulse,
+                          pwm_bits=pwm_bits,
+                          pwm_lsb_nanoseconds=pwm_lsb_nanoseconds)
 
-    # ダブルバッファリング用キャンバスの作成
     canvas = matrix.CreateFrameCanvas()
-
-    # 現在表示中の画像パスを記録
     current_displayed_path = None
+
+    # idx が 1 未満の場合は 1、parallel より大きい場合は parallel とする
+    if idx < 1:
+        idx = 1
+    if idx > parallel:
+        idx = parallel
 
     try:
         while True:
             latest_image_path = get_latest_image_path(watch_folder)
-
-            # 新しい画像ファイルが見つかった場合のみ再表示
             if latest_image_path and latest_image_path != current_displayed_path:
                 try:
                     image = Image.open(latest_image_path).convert("RGB")
-
-                    # --idx が 1 以上、かつ parallel の範囲内なら部分表示用のクロップ処理を実施
-                    if 1 <= idx <= parallel:
-                        # 画像全体を parallel 分割したうち、(idx) 番目の領域を抽出する
-                        orig_width, orig_height = image.size
-                        crop_top = int(orig_height * (idx - 1) / parallel)
-                        crop_bottom = int(orig_height * idx / parallel)
-                        image = image.crop((0, crop_top, orig_width, crop_bottom))
-                        # リサイズ後のサイズは、横: パネル全体幅, 縦: 1パネル分 (rows)
-                        image = image.resize((total_width, rows), Image.Resampling.LANCZOS)
-                        # キャンバスをクリアして、対応するパネル行 (y オフセット (idx-1)*rows) に配置
-                        canvas.Clear()
-                        canvas.SetImage(image, 0, (idx - 1) * rows)
-                        print(f"[INFO] Displayed cropped image (idx={idx}): {latest_image_path}")
-                    else:
-                        # --idx が指定されていない（または 0 または範囲外）場合は、画像全体を表示
-                        image = image.resize((total_width, total_height), Image.Resampling.LANCZOS)
+                    if parallel > 1:
+                        # まず、元画像を全体画像の解像度にリサイズ
+                        image = image.resize((overall_width, overall_height), Image.Resampling.LANCZOS)
+                        # 上から idx 番目の段をクロップする
+                        crop_top = (idx - 1) * rows
+                        crop_bottom = idx * rows
+                        image = image.crop((0, crop_top, overall_width, crop_bottom))
+                        # クロップ後の画像は (overall_width, rows) となるので、物理パネルに合わせて表示
                         canvas.Clear()
                         canvas.SetImage(image, 0, 0)
-                        print(f"[INFO] Displayed full image: {latest_image_path}")
+                        print(f"[INFO] Displayed cropped image (idx={idx}) from {latest_image_path}")
+                    else:
+                        # parallel==1 の場合は、全体画像を物理解像度にリサイズして表示
+                        image = image.resize((physical_width, physical_height), Image.Resampling.LANCZOS)
+                        canvas.Clear()
+                        canvas.SetImage(image, 0, 0)
+                        print(f"[INFO] Displayed full image (parallel=1) from {latest_image_path}")
 
-                    # ダブルバッファリングでスムーズに画面更新
                     canvas = matrix.SwapOnVSync(canvas)
                     current_displayed_path = latest_image_path
                 except Exception as e:
                     print(f"[ERROR] Failed to display {latest_image_path}: {e}")
-
-            # 1秒ごとに監視フォルダを再確認
             time.sleep(1)
     except KeyboardInterrupt:
         print("Exiting gracefully.")

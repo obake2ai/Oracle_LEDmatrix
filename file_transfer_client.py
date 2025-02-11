@@ -2,22 +2,12 @@
 import argparse
 import struct
 import sys
-from bluetooth import BluetoothSocket, RFCOMM, find_service
+from bluetooth import BluetoothSocket, RFCOMM
 
-def send_file(server_address, filename, uuid="94f39d29-7d6d-437d-973b-fba39e49d4ee"):
-    print("サービスを検索中…")
-    service_matches = find_service(uuid=uuid, address=server_address)
-    if len(service_matches) == 0:
-        print("サービスが見つかりません")
-        sys.exit(0)
-
-    first_match = service_matches[0]
-    port = first_match["port"]
-    host = first_match["host"]
-    print("ホスト:", host, "ポート:", port)
-
+def send_file(server_address, port, filename):
     sock = BluetoothSocket(RFCOMM)
-    sock.connect((host, port))
+    print(f"サーバ {server_address} のポート {port} に接続中…")
+    sock.connect((server_address, port))
     print("接続しました")
 
     try:
@@ -26,10 +16,11 @@ def send_file(server_address, filename, uuid="94f39d29-7d6d-437d-973b-fba39e49d4
     except Exception as e:
         print("ファイル読み込みエラー:", e)
         sock.close()
-        sys.exit(0)
+        sys.exit(1)
 
     file_size = len(file_data)
-    filename_bytes = filename.encode("utf-8")
+    # ファイル名はパスではなく basename のみを送る（受信側の保存先は output_dir で指定）
+    filename_bytes =  (filename.split("/")[-1]).encode("utf-8")
 
     try:
         # 1. ファイル名の長さ（4 バイト）を送信
@@ -47,16 +38,15 @@ def send_file(server_address, filename, uuid="94f39d29-7d6d-437d-973b-fba39e49d4
         sock.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Bluetooth File Transfer Client")
+    parser = argparse.ArgumentParser(description="Bluetooth File Transfer Client (No advertise_service)")
     parser.add_argument("--server", required=True,
-                        help="受信側デバイスのBluetoothアドレス（例: B8:27:EB:1F:CC:9F）")
+                        help="受信側デバイスの Bluetooth アドレス（例: B8:27:EB:1F:CC:9F）")
+    parser.add_argument("--port", type=int, default=3,
+                        help="接続する RFCOMM ポート（デフォルト: 3）")
     parser.add_argument("--file", required=True,
                         help="送信するファイルのパス")
-    parser.add_argument("--uuid", default="94f39d29-7d6d-437d-973b-fba39e49d4ee",
-                        help="サービスのUUID")
     args = parser.parse_args()
-
-    send_file(server_address=args.server, filename=args.file, uuid=args.uuid)
+    send_file(server_address=args.server, port=args.port, filename=args.file)
 
 if __name__ == '__main__':
     main()

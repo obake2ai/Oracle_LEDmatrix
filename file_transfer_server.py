@@ -2,23 +2,14 @@
 import argparse
 import os
 import struct
-from bluetooth import BluetoothSocket, RFCOMM, advertise_service, SERIAL_PORT_CLASS, SERIAL_PORT_PROFILE
+from bluetooth import BluetoothSocket, RFCOMM
 
-def run_server(port=0, output_dir=".", uuid="94f39d29-7d6d-437d-973b-fba39e49d4ee"):
-    # RFCOMM ソケットを作成して待ち受け
+def run_server(port, output_dir="."):
+    # RFCOMM ソケットを作成して指定ポートで待ち受け
     server_sock = BluetoothSocket(RFCOMM)
-    server_sock.bind(("", port))  # port が 0 の場合は自動で空いているポートが割り当てられます
+    server_sock.bind(("", port))
     server_sock.listen(1)
     actual_port = server_sock.getsockname()[1]
-
-    # サービスの広告（advertise）
-    advertise_service(
-        server_sock,
-        "FileTransferServer",
-        service_id=uuid,
-        service_classes=[uuid, SERIAL_PORT_CLASS],
-        profiles=[SERIAL_PORT_PROFILE]
-    )
     print(f"RFCOMM チャネル {actual_port} で接続待ち…")
 
     client_sock, client_info = server_sock.accept()
@@ -33,7 +24,7 @@ def run_server(port=0, output_dir=".", uuid="94f39d29-7d6d-437d-973b-fba39e49d4e
         filename_len = struct.unpack('>I', data)[0]
 
         # 2. ファイル名を受信
-        filename = client_sock.recv(filename_len).decode('utf-8')
+        filename = client_sock.recv(filename_len).decode("utf-8")
         print("受信ファイル名:", filename)
 
         # 3. ファイルサイズ（8 バイト）を受信
@@ -44,10 +35,10 @@ def run_server(port=0, output_dir=".", uuid="94f39d29-7d6d-437d-973b-fba39e49d4e
         file_size = struct.unpack('>Q', data)[0]
         print("ファイルサイズ:", file_size, "バイト")
 
-        # 4. ファイルデータを受信
+        # 4. ファイルデータを受信して保存
         received = 0
-        output_path = os.path.join(output_dir, filename)
-        with open(output_path, 'wb') as f:
+        output_path = os.path.join(output_dir, os.path.basename(filename))
+        with open(output_path, "wb") as f:
             while received < file_size:
                 chunk = client_sock.recv(1024)
                 if not chunk:
@@ -63,16 +54,13 @@ def run_server(port=0, output_dir=".", uuid="94f39d29-7d6d-437d-973b-fba39e49d4e
         server_sock.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Bluetooth File Transfer Server")
-    parser.add_argument("--port", type=int, default=0,
-                        help="使用するRFCOMMポート（デフォルト: 0（自動割り当て））")
+    parser = argparse.ArgumentParser(description="Bluetooth File Transfer Server (No advertise_service)")
+    parser.add_argument("--port", type=int, default=3,
+                        help="使用する RFCOMM ポート（デフォルト: 3）")
     parser.add_argument("--output-dir", default=".",
                         help="受信ファイルの保存ディレクトリ（デフォルト: カレントディレクトリ）")
-    parser.add_argument("--uuid", default="94f39d29-7d6d-437d-973b-fba39e49d4ee",
-                        help="サービスのUUID")
     args = parser.parse_args()
-
-    run_server(port=args.port, output_dir=args.output_dir, uuid=args.uuid)
+    run_server(port=args.port, output_dir=args.output_dir)
 
 if __name__ == '__main__':
     main()

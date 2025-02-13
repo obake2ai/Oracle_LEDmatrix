@@ -21,6 +21,12 @@ sudo raspi-config nonint do_vnc 0
 # 2. システムの更新とアップグレード
 ############################
 echo "=== システムの更新とアップグレード ==="
+echo "aptのロック解除を待っています..."
+while sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+  sleep 5
+done
+
+echo "ロックが解除されました。システム更新を開始します。"
 sudo apt update && sudo apt upgrade -y
 
 ############################

@@ -55,7 +55,7 @@ sleep 5
 
 # 接続状態の確認
 if iw dev wlan0 link | grep -q "Not connected"; then
-  echo "Wi-Fi接続に失敗しました。SSIDやパスワード、設定内容を確認してください。"
+  echo "※ 注意: Wi-Fi接続に失敗しました。（セットアップ時は、ギャラリー用Wi-Fiを設定するため実際の接続は期待していません。）"
 else
   echo "Wi-Fi接続に成功しました。"
 fi
@@ -63,9 +63,26 @@ fi
 ############################
 # 5. rpi-rgb-led-matrix リポジトリのクローンとビルド
 ############################
+# github.com に接続できるかチェックする関数
+check_network() {
+  local RETRY=0
+  local MAX_RETRY=5
+  while ! ping -c 1 github.com &>/dev/null; do
+    RETRY=$((RETRY+1))
+    if [ "$RETRY" -ge "$MAX_RETRY" ]; then
+      echo "ネットワーク接続に失敗しました。github.com に接続できません。"
+      exit 1
+    fi
+    echo "ネットワーク接続待機中... ($RETRY/$MAX_RETRY)"
+    sleep 5
+  done
+}
+
 echo "=== rpi-rgb-led-matrix のクローンとビルド ==="
 cd ~
 if [ ! -d "rpi-rgb-led-matrix" ]; then
+  echo "github.com への接続を確認します..."
+  check_network
   git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
 else
   echo "rpi-rgb-led-matrix ディレクトリが既に存在するため、クローン処理をスキップします。"

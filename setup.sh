@@ -14,6 +14,7 @@ WIFI_PASS="$2"
 # 1. VNC の有効化
 ############################
 echo "=== VNC を有効化します ==="
+cd ~
 sudo raspi-config nonint do_vnc 0
 
 ############################
@@ -84,7 +85,7 @@ else
   echo "Oracle_LEDmatrix ディレクトリが既に存在するため、クローン処理をスキップします。"
 fi
 cd Oracle_LEDmatrix
-pip install click
+sudo python3 sample_view.py --no-hardware-pulse --gpio-slowdown=4 --chain-length=1 --parallel=1 --pwm-bits=9 --pwm-lsb-nanoseconds=100 --image ./samples/oracle_sample.png
 
 ############################
 # 7. Python の cap_sys_nice 権限設定

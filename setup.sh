@@ -1,11 +1,19 @@
 #!/bin/bash
 set -e  # エラー発生時にスクリプトを終了
 
+# コマンドライン引数でSSIDとパスワードを受け取る
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <wifi_ssid> <wifi_password>"
+  exit 1
+fi
+
+WIFI_SSID="$1"
+WIFI_PASS="$2"
+
 ############################
-# 1. VNCの有効化
+# 1. VNC の有効化
 ############################
 echo "=== VNC を有効化します ==="
-# 非対話型で VNC を有効化 (0: enable)
 sudo raspi-config nonint do_vnc 0
 
 ############################
@@ -21,16 +29,15 @@ echo "=== cython3 のインストール ==="
 sudo apt install -y cython3
 
 ############################
-# 4. Wi‑Fi 接続設定
+# 4. Wi‑Fi 接続設定 (2.4GHz, 隠しSSID)
 ############################
 echo "=== Wi-Fi 設定 ==="
-# Pi Zero 2 WHは2.4GHzのみ対応
-# ※ 接続するWi‑FiのSSIDとパスワードを設定してください
-WIFI_SSID="rootk-guest2.4"
-WIFI_PASS="rootk8808"
-
-# Wi‑Fiがステルス（隠し）SSIDの場合は scan_ssid=1 が必要
-sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf > /dev/null <<EOF
+# 指定のSSIDが既に存在するか確認し、存在しなければ設定を追記
+if grep -q "ssid=\"$WIFI_SSID\"" /etc/wpa_supplicant/wpa_supplicant.conf; then
+    echo "既に $WIFI_SSID の設定が存在するため、追加はスキップします。"
+else
+    echo "新たなWi‑Fi設定を /etc/wpa_supplicant/wpa_supplicant.conf に追記します。"
+    sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf > /dev/null <<EOF
 
 network={
     ssid="$WIFI_SSID"
@@ -38,17 +45,29 @@ network={
     scan_ssid=1
 }
 EOF
+fi
 
-echo "Wi-Fi設定を更新しました。ネットワークサービスを再起動します。"
-# Wi-Fi再設定を試みる。失敗した場合は dhcpcd を再起動
-sudo wpa_cli -i wlan0 reconfigure || sudo systemctl restart dhcpcd
+echo "Wi-Fi設定を更新しました。wpa_supplicant を再起動して接続を試みます。"
+sudo systemctl restart wpa_supplicant
+sleep 5
+
+# 接続状態の確認
+if iw dev wlan0 link | grep -q "Not connected"; then
+  echo "Wi-Fi接続に失敗しました。SSIDやパスワード、設定内容を確認してください。"
+else
+  echo "Wi-Fi接続に成功しました。"
+fi
 
 ############################
 # 5. rpi-rgb-led-matrix リポジトリのクローンとビルド
 ############################
 echo "=== rpi-rgb-led-matrix のクローンとビルド ==="
 cd ~
-git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+if [ ! -d "rpi-rgb-led-matrix" ]; then
+  git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+else
+  echo "rpi-rgb-led-matrix ディレクトリが既に存在するため、クローン処理をスキップします。"
+fi
 cd rpi-rgb-led-matrix
 make
 sudo make install-python
@@ -58,7 +77,11 @@ sudo make install-python
 ############################
 echo "=== Oracle_LEDmatrix のクローンとセットアップ ==="
 cd ~
-git clone https://github.com/obake2ai/Oracle_LEDmatrix.git
+if [ ! -d "Oracle_LEDmatrix" ]; then
+  git clone https://github.com/obake2ai/Oracle_LEDmatrix.git
+else
+  echo "Oracle_LEDmatrix ディレクトリが既に存在するため、クローン処理をスキップします。"
+fi
 cd Oracle_LEDmatrix
 pip install click
 

@@ -25,8 +25,9 @@ sudo apt update && sudo apt upgrade -y
 ############################
 # 3. 必要なパッケージのインストール (cython3)
 ############################
-echo "=== cython3 のインストール ==="
+echo "=== cython3 python3-click のインストール ==="
 sudo apt install -y cython3
+sudo apt install python3-click
 
 ############################
 # 4. Wi‑Fi 接続設定 (2.4GHz, 隠しSSID)

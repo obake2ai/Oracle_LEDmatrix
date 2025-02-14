@@ -39,32 +39,32 @@ sudo apt install python3-click
 ############################
 # 4. Wi‑Fi 接続設定 (2.4GHz, 隠しSSID)
 ############################
-echo "=== Wi-Fi 設定 ==="
-# 指定のSSIDが既に存在するか確認し、存在しなければ設定を追記
-if grep -q "ssid=\"$WIFI_SSID\"" /etc/wpa_supplicant/wpa_supplicant.conf; then
-    echo "既に $WIFI_SSID の設定が存在するため、追加はスキップします。"
-else
-    echo "新たなWi‑Fi設定を /etc/wpa_supplicant/wpa_supplicant.conf に追記します。"
-    sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf > /dev/null <<EOF
-
-network={
-    ssid="$WIFI_SSID"
-    psk="$WIFI_PASS"
-    scan_ssid=1
-}
-EOF
-fi
-
-echo "Wi-Fi設定を更新しました。wpa_supplicant を再起動して接続を試みます。"
-sudo systemctl restart wpa_supplicant
-sleep 5
-
-# 接続状態の確認
-if iw dev wlan0 link | grep -q "Not connected"; then
-  echo "※ 注意: Wi-Fi接続に失敗しました。（セットアップ時は、ギャラリー用Wi-Fiを設定するため実際の接続は期待していません。）"
-else
-  echo "Wi-Fi接続に成功しました。"
-fi
+# echo "=== Wi-Fi 設定 ==="
+# # 指定のSSIDが既に存在するか確認し、存在しなければ設定を追記
+# if grep -q "ssid=\"$WIFI_SSID\"" /etc/wpa_supplicant/wpa_supplicant.conf; then
+#     echo "既に $WIFI_SSID の設定が存在するため、追加はスキップします。"
+# else
+#     echo "新たなWi‑Fi設定を /etc/wpa_supplicant/wpa_supplicant.conf に追記します。"
+#     sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf > /dev/null <<EOF
+#
+# network={
+#     ssid="$WIFI_SSID"
+#     psk="$WIFI_PASS"
+#     scan_ssid=1
+# }
+# EOF
+# fi
+#
+# echo "Wi-Fi設定を更新しました。wpa_supplicant を再起動して接続を試みます。"
+# sudo systemctl restart wpa_supplicant
+# sleep 5
+#
+# # 接続状態の確認
+# if iw dev wlan0 link | grep -q "Not connected"; then
+#   echo "※ 注意: Wi-Fi接続に失敗しました。（セットアップ時は、ギャラリー用Wi-Fiを設定するため実際の接続は期待していません。）"
+# else
+#   echo "Wi-Fi接続に成功しました。"
+# fi
 
 ############################
 # 5. rpi-rgb-led-matrix リポジトリのクローンとビルド

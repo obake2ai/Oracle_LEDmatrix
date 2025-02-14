@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e  # エラー発生時にスクリプトを終了
 
-# コマンドライン引数でSSIDとパスワードを受け取る
-if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <wifi_ssid> <wifi_password>"
-  exit 1
-fi
-
-WIFI_SSID="$1"
-WIFI_PASS="$2"
+# # コマンドライン引数でSSIDとパスワードを受け取る
+# if [ "$#" -ne 2 ]; then
+#   echo "Usage: $0 <wifi_ssid> <wifi_password>"
+#   exit 1
+# fi
+#
+# WIFI_SSID="$1"
+# WIFI_PASS="$2"
 
 ############################
 # 1. VNC の有効化

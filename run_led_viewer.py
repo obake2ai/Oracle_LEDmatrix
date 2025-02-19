@@ -4,7 +4,7 @@ import time
 import glob
 
 import click
-from PIL import Image
+from PIL import Image, ImageEnhance
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 
@@ -77,9 +77,11 @@ def setup_matrix(rows, cols, chain_length, parallel,
               help='PWM LSB nanoseconds。低い値ほど高フレッシュレートになる')
 @click.option('--idx', default=1, type=int,
               help='全体画像の中で表示する段の番号 (上から1～parallel)。例えば --parallel=3 の場合、--idx 1,2,3 でそれぞれ上、中、下の部分を表示')
+@click.option('--brightness', default=100, type=int,
+              help='LEDパネルの明るさ（デフォルト 100）。値はパーセンテージとして扱われます。')
 def main(watch_folder, image, rows, cols, chain_length, parallel,
          hardware_mapping, gpio_slowdown, no_hardware_pulse,
-         pwm_bits, pwm_lsb_nanoseconds, idx):
+         pwm_bits, pwm_lsb_nanoseconds, idx, brightness):
     """
     LED パネルをセットアップし、以下のいずれかの画像を表示します。
 
@@ -95,6 +97,8 @@ def main(watch_folder, image, rows, cols, chain_length, parallel,
     各ハードウェアは物理的に1段分の表示（解像度: 横 = chain-length×cols, 縦 = rows）を行います。
     複数台のハードウェアで全体画像の各段を表示する場合、
     各ハードウェアには同じ画像を渡し、--parallel で全体の段数、--idx で表示する段番号 (上から) を指定してください。
+
+    さらに、--brightness オプションにより画像の明るさを調整可能です（デフォルトは 100%）。
     """
     # 全体画像の想定解像度
     overall_width = cols * chain_length
@@ -138,16 +142,19 @@ def main(watch_folder, image, rows, cols, chain_length, parallel,
                         crop_top = (idx - 1) * rows
                         crop_bottom = idx * rows
                         img = img.crop((0, crop_top, overall_width, crop_bottom))
-                        # クロップ後の画像は (overall_width, rows) となるので、物理パネルに合わせて表示
+                        # 画像の明るさを調整（brightness=100 ならそのまま）
+                        img = ImageEnhance.Brightness(img).enhance(brightness / 100.0)
                         canvas.Clear()
                         canvas.SetImage(img, 0, 0)
-                        print(f"[INFO] Displayed cropped image (idx={idx}) from {new_path}")
+                        print(f"[INFO] Displayed cropped image (idx={idx}) from {new_path} with brightness {brightness}")
                     else:
                         # parallel==1 の場合は、全体画像を物理解像度にリサイズして表示
                         img = img.resize((physical_width, physical_height), Image.Resampling.LANCZOS)
+                        # 画像の明るさを調整
+                        img = ImageEnhance.Brightness(img).enhance(brightness / 100.0)
                         canvas.Clear()
                         canvas.SetImage(img, 0, 0)
-                        print(f"[INFO] Displayed full image (parallel=1) from {new_path}")
+                        print(f"[INFO] Displayed full image (parallel=1) from {new_path} with brightness {brightness}")
 
                     canvas = matrix.SwapOnVSync(canvas)
                     current_displayed_path = new_path

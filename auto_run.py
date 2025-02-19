@@ -25,7 +25,7 @@ def main():
     # 3. 共通設定を取得
     gpio_slowdown = PI_CONFIG['gpio-slowdown']
     no_hardware_pulse = PI_CONFIG['no_hardware_pulse']
-    default_pwm_bits = PI_CONFIG['led-pwm-bits']
+    pwm_bits = PI_CONFIG['led-pwm-bits']
 
     # 4. ホスト固有のパラメータを取得
     chain_length = host_config['chain_length']

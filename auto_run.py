@@ -52,7 +52,7 @@ def main():
         "--parallel", str(parallel),
         "--pwm-bits", str(pwm_bits),
         "--idx", str(idx),
-        "--pwm-lsb-nanosecond", str(pwm_lsb_nanosecond),
+        "--pwm-lsb-nanoseconds", str(pwm_lsb_nanosecond),
         "--watch-folder", watch_folder,
     ]
 

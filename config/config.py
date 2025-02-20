@@ -3,8 +3,8 @@
 PI_CONFIG = {
     # 共通設定
     'gpio-slowdown': 1,
-    'no_hardware_pulse': True,
-    'led-pwm-bits': 4,
+    'no_hardware_pulse': False,
+    'led-pwm-bits': 8,
     # 各転送先の設定（ここに最大20件程度追加可能）
     'settings': [
         {

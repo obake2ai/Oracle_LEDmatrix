@@ -5,6 +5,7 @@ PI_CONFIG = {
     'gpio-slowdown': 1,
     'no_hardware_pulse': False,
     'led-pwm-bits': 8,
+    'pwm-lsb-nanosecond': 100,
     # 各転送先の設定（ここに最大20件程度追加可能）
     'settings': [
         {

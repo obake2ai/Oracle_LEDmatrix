@@ -27,6 +27,7 @@ def main():
     no_hardware_pulse = PI_CONFIG['no_hardware_pulse']
     pwm_bits = PI_CONFIG['led-pwm-bits']
     pwm_lsb_nanosecond = PI_CONFIG['pwm-lsb-nanosecond']
+    brightness = PI_CONFIG['brightness']
 
     # 4. ホスト固有のパラメータを取得
     chain_length = host_config['chain_length']
@@ -53,6 +54,7 @@ def main():
         "--pwm-bits", str(pwm_bits),
         "--idx", str(idx),
         "--pwm-lsb-nanoseconds", str(pwm_lsb_nanosecond),
+        "--brightness", str(brightness),
         "--watch-folder", watch_folder,
     ]
 

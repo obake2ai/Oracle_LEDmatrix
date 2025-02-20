@@ -26,6 +26,7 @@ def main():
     gpio_slowdown = PI_CONFIG['gpio-slowdown']
     no_hardware_pulse = PI_CONFIG['no_hardware_pulse']
     pwm_bits = PI_CONFIG['led-pwm-bits']
+    pwm_lsb_nanosecond = PI_CONFIG['pwm-lsb-nanosecond']
 
     # 4. ホスト固有のパラメータを取得
     chain_length = host_config['chain_length']
@@ -51,6 +52,7 @@ def main():
         "--parallel", str(parallel),
         "--pwm-bits", str(pwm_bits),
         "--idx", str(idx),
+        "--pwm-lsb-nanosecond", str(pwm_lsb_nanosecond),
         "--watch-folder", watch_folder,
     ]
 

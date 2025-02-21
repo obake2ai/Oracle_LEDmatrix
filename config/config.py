@@ -6,7 +6,7 @@ PI_CONFIG = {
     'no_hardware_pulse': False,
     'led-pwm-bits': 8,
     'pwm-lsb-nanosecond': 100,
-    'brightness': 30,
+    'brightness': 70,
     # 各転送先の設定（ここに最大20件程度追加可能）
     'settings': [
         {
